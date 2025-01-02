@@ -1,0 +1,13 @@
+{
+  "dotnet.defaultSolution": "./src/Schedulr.sln",
+  "editor.formatOnSave": true,
+  "cSpell.words": [
+    "buildtransitive",
+    "contentfiles",
+    "msbuild",
+    "reportgenerator",
+    "reporttypes",
+    "Schedulr",
+    "targetdir"
+  ]
+}
