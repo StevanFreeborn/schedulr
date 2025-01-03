@@ -5,6 +5,7 @@
     "buildtransitive",
     "contentfiles",
     "msbuild",
+    "Pkcs",
     "reportgenerator",
     "reporttypes",
     "Schedulr",
