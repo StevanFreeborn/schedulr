@@ -24,6 +24,12 @@ if (string.IsNullOrWhiteSpace(privateKeyFilePath))
   return;
 }
 
+if (string.IsNullOrWhiteSpace(calendarId))
+{
+  Console.WriteLine("Calendar Id is not set.");
+  return;
+}
+
 var privateKeyFileContent = await File.ReadAllTextAsync(privateKeyFilePath);
 
 var serviceAccount = JsonSerializer.Deserialize<ServiceAccount>(privateKeyFileContent, JsonOptions.Default);
@@ -63,7 +69,6 @@ if (tokenResponseContent is null)
   return;
 }
 
-
 httpClient.DefaultRequestHeaders.Authorization = new("Bearer", tokenResponseContent.AccessToken);
 
 var addCalendarRequest = new StringContent(JsonSerializer.Serialize(new
@@ -86,10 +91,11 @@ var getCalendarsResponse = await httpClient.GetAsync("https://www.googleapis.com
 
 if (getCalendarsResponse.IsSuccessStatusCode is false)
 {
-  Console.WriteLine("Failed to get calendars.");
-  Console.WriteLine(getCalendarsResponse.StatusCode);
+  Console.WriteLine("Failed to get calendars: {0}", getCalendarsResponse.StatusCode);
+
   var errorContent = await getCalendarsResponse.Content.ReadAsStringAsync();
   Console.WriteLine(errorContent);
+
   return;
 }
 
@@ -101,10 +107,11 @@ var getCalendarEventsResponse = await httpClient.GetAsync($"https://www.googleap
 
 if (getCalendarEventsResponse.IsSuccessStatusCode is false)
 {
-  Console.WriteLine("Failed to get calendar events.");
-  Console.WriteLine(getCalendarEventsResponse.StatusCode);
+  Console.WriteLine("Failed to get calendar events: {0}", getCalendarEventsResponse.StatusCode);
+
   var errorContent = await getCalendarEventsResponse.Content.ReadAsStringAsync();
   Console.WriteLine(errorContent);
+
   return;
 }
 
