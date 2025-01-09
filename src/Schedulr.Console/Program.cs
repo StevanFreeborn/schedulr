@@ -1,5 +1,8 @@
 ﻿
 using System.Buffers.Text;
+using System.Data;
+using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,195 +13,118 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using Spectre.Console;
+using Spectre.Console.Cli;
+
 Console.WriteLine("Schedulr Console Application");
 
-var host = Host.CreateDefaultBuilder().Build();
-var config = host.Services.GetRequiredService<IConfiguration>();
-
-var privateKeyFilePath = config["PrivateKeyFilePath"];
-var calendarId = config["TestCalendarId"];
-
-if (string.IsNullOrWhiteSpace(privateKeyFilePath))
-{
-  Console.WriteLine("Private key file path is not set.");
-  return;
-}
-
-var privateKeyFileContent = await File.ReadAllTextAsync(privateKeyFilePath);
-
-var serviceAccount = JsonSerializer.Deserialize<ServiceAccount>(privateKeyFileContent, JsonOptions.Default);
-
-if (serviceAccount is null)
-{
-  Console.WriteLine("Service account is not valid.");
-  return;
-}
-
-var jwtHeader = new JWTHeader(serviceAccount.PrivateKeyId);
-var jwtClaims = new JWTClaims(serviceAccount.ClientEmail);
-var jwt = new JWT(jwtHeader, jwtClaims);
-var jwtToken = jwt.CreateSignedToken(serviceAccount.PrivateKey);
-
-var httpClient = new HttpClient();
-
-var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
-{
-  ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
-  ["assertion"] = jwtToken,
-});
-
-var tokenResponse = await httpClient.PostAsync("https://oauth2.googleapis.com/token", tokenRequest);
-
-if (tokenResponse.IsSuccessStatusCode is false)
-{
-  Console.WriteLine("Failed to get access token.");
-  return;
-}
-
-var tokenResponseContent = await tokenResponse.Content.ReadFromJsonAsync<TokenResponse>();
-
-if (tokenResponseContent is null)
-{
-  Console.WriteLine("Failed to read token response content.");
-  return;
-}
-
-
-httpClient.DefaultRequestHeaders.Authorization = new("Bearer", tokenResponseContent.AccessToken);
-
-var addCalendarRequest = new StringContent(JsonSerializer.Serialize(new
-{
-  id = calendarId,
-}), Encoding.UTF8, "application/json");
-
-var addCalendarResponse = await httpClient.PostAsync("https://www.googleapis.com/calendar/v3/users/me/calendarList", addCalendarRequest);
-
-if (addCalendarResponse.IsSuccessStatusCode is false)
-{
-  Console.WriteLine("Failed to add calendar.");
-  Console.WriteLine(addCalendarResponse.StatusCode);
-  var errorContent = await addCalendarResponse.Content.ReadAsStringAsync();
-  Console.WriteLine(errorContent);
-  return;
-}
-
-var getCalendarsResponse = await httpClient.GetAsync("https://www.googleapis.com/calendar/v3/users/me/calendarList");
-
-if (getCalendarsResponse.IsSuccessStatusCode is false)
-{
-  Console.WriteLine("Failed to get calendars.");
-  Console.WriteLine(getCalendarsResponse.StatusCode);
-  var errorContent = await getCalendarsResponse.Content.ReadAsStringAsync();
-  Console.WriteLine(errorContent);
-  return;
-}
-
-var calendarsResponseContent = await getCalendarsResponse.Content.ReadAsStringAsync();
-
-Console.WriteLine(calendarsResponseContent);
-
-var getCalendarEventsResponse = await httpClient.GetAsync($"https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events");
-
-if (getCalendarEventsResponse.IsSuccessStatusCode is false)
-{
-  Console.WriteLine("Failed to get calendar events.");
-  Console.WriteLine(getCalendarEventsResponse.StatusCode);
-  var errorContent = await getCalendarEventsResponse.Content.ReadAsStringAsync();
-  Console.WriteLine(errorContent);
-  return;
-}
-
-var calendarEventsResponseContent = await getCalendarEventsResponse.Content.ReadAsStringAsync();
-
-Console.WriteLine(calendarEventsResponseContent);
-
-record TokenResponse(
-  [property: JsonPropertyName("access_token")]
-  string AccessToken,
-  [property: JsonPropertyName("scope")]
-  string Scope,
-  [property: JsonPropertyName("expires_in")]
-  int ExpiresIn,
-  [property: JsonPropertyName("token_type")]
-  string TokenType
-);
-
-record ServiceAccount(
-  [property: JsonPropertyName("client_email")]
-  string ClientEmail,
-  [property: JsonPropertyName("private_key_id")]
-  string PrivateKeyId,
-  [property: JsonPropertyName("private_key")]
-  string PrivateKey
-);
-
-record JWT(JWTHeader Header, JWTClaims Claims)
-{
-  public string CreateSignedToken(string privateKey)
+var host = Host.CreateDefaultBuilder()
+  .ConfigureServices((_, services) =>
   {
-    var header = Header.ToBase64UrlEncodedString();
-    var claims = Claims.ToBase64UrlEncodedString();
-    var unsignedToken = $"{header}.{claims}";
+    services.AddSingleton(AnsiConsole.Console);
+  })
+  .Build();
 
-    var rsa = RSA.Create();
-    rsa.ImportFromPem(privateKey);
+class LoginCommand(IAnsiConsole console, IConfiguration configuration) : Command
+{
+  private readonly IAnsiConsole _console = console;
+  private readonly IConfiguration _configuration = configuration;
 
-    var signature = rsa.SignData(
-      Encoding.UTF8.GetBytes(unsignedToken),
-      HashAlgorithmName.SHA256,
-      RSASignaturePadding.Pkcs1
-    );
+  public override int Execute(CommandContext context)
+  {
+    var googleConfig = _configuration.GetSection("Google");
+    var redirectUri = googleConfig["RedirectUri"];
+    var clientId = googleConfig["ClientId"];
+    var clientSecret = googleConfig["ClientSecret"];
 
-    var signatureBase64UrlEncoded = Base64Url.EncodeToString(signature);
+    var baseAuthUri = "https://accounts.google.com/o/oauth2/v2/auth";
+    var authUriQueryParams = new Dictionary<string, string>
+    {
+      ["client_id"] = clientId!,
+      ["redirect_uri"] = redirectUri!,
+      ["response_type"] = "code",
+      ["scope"] = "https://www.googleapis.com/auth/calendar",
+      ["access_type"] = "offline"
+    };
 
-    return $"{unsignedToken}.{signatureBase64UrlEncoded}";
+    var authUri = $"{baseAuthUri}?{string.Join("&", authUriQueryParams.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"))}";
+
+    Process.Start(new ProcessStartInfo
+    {
+      FileName = authUri,
+      UseShellExecute = true
+    });
+
+    var oauthCode = string.Empty;
+
+    _console.Status()
+      .Start("[bold]Waiting for login...[/]", ctx =>
+      {
+        using var listener = new HttpListener();
+        listener.Prefixes.Add(redirectUri!);
+        listener.Start();
+
+        ctx.Spinner(Spinner.Known.Dots);
+
+        var listenerContext = listener.GetContext();
+        oauthCode = listenerContext.Request.QueryString["code"];
+
+        if (!string.IsNullOrEmpty(oauthCode))
+        {
+          // TODO: Proper HTML response
+          string responseHtml = @"
+                <html>
+                <body>
+                    <script>
+                        alert('Login successful! You can close this window now.');
+                    </script>
+                </body>
+                </html>";
+          byte[] buffer = Encoding.UTF8.GetBytes(responseHtml);
+          listenerContext.Response.ContentLength64 = buffer.Length;
+          listenerContext.Response.OutputStream.Write(buffer, 0, buffer.Length);
+          listenerContext.Response.Close();
+        }
+
+        listener.Stop();
+
+        _console.MarkupLine($"[bold]Received OAuth code: {oauthCode}[/]");
+      });
+
+    if (string.IsNullOrEmpty(oauthCode))
+    {
+      _console.MarkupLine("[bold red]Failed to get OAuth code[/]");
+      return 1;
+    }
+
+    // TODO: This probably needs to be a request to
+    // my own server to prevent asking people to use their
+    // own clients.
+    var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
+    {
+      Content = new FormUrlEncodedContent(new Dictionary<string, string>
+      {
+        ["code"] = oauthCode,
+        ["client_id"] = clientId!,
+        ["client_secret"] = clientSecret!,
+        ["redirect_uri"] = redirectUri!,
+        ["grant_type"] = "authorization_code"
+      })
+    };
+
+    var tokenResponse = new HttpClient().Send(tokenRequest);
+
+    if (!tokenResponse.IsSuccessStatusCode)
+    {
+      _console.MarkupLine("[bold red]Failed to get OAuth token[/]");
+      return 1;
+    }
+
+    // TODO: Parse and persist tokens
+    var tokenResponseJson = tokenResponse.Content.ReadAsStringAsync().Result;
+
+    _console.MarkupLine($"[bold]OAuth token response: {tokenResponseJson}[/]");
+
+    return 0;
   }
-}
-
-record JWTHeader(string KeyId) : EncodedJWTComponent
-{
-  [JsonPropertyName("alg")]
-  public string Algorithm { get; } = "RS256";
-
-  [JsonPropertyName("typ")]
-  public string Type { get; } = "JWT";
-
-  [JsonPropertyName("kid")]
-  public string KeyId { get; init; } = KeyId;
-}
-
-record JWTClaims(
-  [property: JsonPropertyName("iss")]
-  string Issuer
-) : EncodedJWTComponent()
-{
-  public string Scope { get; } = "https://www.googleapis.com/auth/calendar";
-
-  [JsonPropertyName("aud")]
-  public string Audience { get; } = "https://oauth2.googleapis.com/token";
-
-  [JsonPropertyName("exp")]
-  public long Expiry { get; } = DateTimeOffset.UtcNow.AddMinutes(60).ToUnixTimeSeconds();
-
-  [JsonPropertyName("iat")]
-  public long IssuedAt { get; init; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-}
-
-abstract record EncodedJWTComponent
-{
-  public virtual string ToBase64UrlEncodedString()
-  {
-    var json = JsonSerializer.Serialize(this, JsonOptions.Default);
-    var bytes = Encoding.UTF8.GetBytes(json);
-    return Base64Url.EncodeToString(bytes);
-  }
-}
-
-static class JsonOptions
-{
-  public static JsonSerializerOptions Default = new()
-  {
-    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    PropertyNameCaseInsensitive = true,
-  };
 }
