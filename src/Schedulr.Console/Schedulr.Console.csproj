@@ -23,4 +23,33 @@
     </None>
   </ItemGroup>
 
+  <PropertyGroup>
+    <GeneratedCodeDirectory>Generated</GeneratedCodeDirectory>
+    <GeneratedConstantsFile>$(GeneratedCodeDirectory)\Constants.cs</GeneratedConstantsFile>
+  </PropertyGroup>
+
+  <Target Name="GenerateBuildConstants" BeforeTargets="BeforeCompile">
+    <PropertyGroup>
+      <ClientId>308790548431-rqpjahd0ul7lmpiegd5cgate1m4kkb11.apps.googleusercontent.com</ClientId>
+      <RedirectUri>http://localhost:7777/schedulr/login-callback/</RedirectUri>
+      <AuthUri>https://localhost:5555</AuthUri>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(GeneratedCodeDirectory)" />
+
+    <WriteLinesToFile
+      File="$(GeneratedConstantsFile)"
+      Lines='
+namespace $(AssemblyName).$(GeneratedCodeDirectory)%3b
+
+static class Constants
+{
+  public const string ClientId = "$(ClientId)"%3b
+  public const string RedirectUri = "$(RedirectUri)"%3b
+  public const string AuthUri = "$(AuthUri)"%3b
+}
+'
+      Overwrite="true" />
+  </Target>
+
 </Project>
