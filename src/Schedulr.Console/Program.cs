@@ -1,6 +1,9 @@
 ﻿using System.Data;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
+using System.Net.Http.Json;
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
 
@@ -13,47 +16,43 @@ using Schedulr.Console.Generated;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
-Console.WriteLine("Schedulr Console Application");
+try
+{
 
-await Host.CreateDefaultBuilder()
-  .ConfigureAppConfiguration(static (context, config) =>
-  {
-    config.SetBasePath(AppContext.BaseDirectory);
-    config.AddJsonFile("appsettings.json");
-  })
-  .ConfigureServices(static (_, services) => services.AddSingleton(AnsiConsole.Console))
-  .BuildApp()
-  .RunAsync(args);
+  await Host.CreateDefaultBuilder()
+    .ConfigureAppConfiguration(static (context, config) =>
+    {
+      config.SetBasePath(AppContext.BaseDirectory);
+      config.AddJsonFile("appsettings.json");
+    })
+    .ConfigureServices(static (_, services) =>
+      {
+        services.AddSingleton(AnsiConsole.Console);
+        services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
+        services.AddSingleton<IResourceManager, ResourceManager>();
+      })
+    .BuildApp()
+    .RunAsync(args);
+}
+catch (Exception ex)
+{
+  AnsiConsole.MarkupLine("[bold red]An error occurred:[/]");
+  AnsiConsole.MarkupLine(CultureInfo.InvariantCulture, "[bold red]{Message}[/]", ex.Message);
+}
 
-class LoginCommand(IAnsiConsole console, IConfiguration configuration) : Command
+class LoginCommand(
+  IAnsiConsole console,
+  IGoogleAuthService authService,
+  IResourceManager resourceManager
+) : AsyncCommand
 {
   readonly IAnsiConsole _console = console;
-  readonly IConfiguration _configuration = configuration;
+  readonly IGoogleAuthService _authService = authService;
+  readonly IResourceManager _resourceManager = resourceManager;
 
-  public override int Execute(CommandContext context)
+  public override async Task<int> ExecuteAsync(CommandContext context)
   {
-    var googleConfig = _configuration.GetSection("Google");
-    var redirectUri = googleConfig["RedirectUri"];
-    var clientId = googleConfig["ClientId"];
-    var clientSecret = googleConfig["ClientSecret"];
-
-    if (string.IsNullOrEmpty(redirectUri) || string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
-    {
-      _console.MarkupLine("[bold red]Google configuration is missing[/]");
-      return 1;
-    }
-
-    var baseAuthUri = "https://accounts.google.com/o/oauth2/v2/auth";
-    var authUriQueryParams = new Dictionary<string, string>
-    {
-      ["client_id"] = clientId,
-      ["redirect_uri"] = redirectUri,
-      ["response_type"] = "code",
-      ["scope"] = "https://www.googleapis.com/auth/calendar",
-      ["access_type"] = "offline"
-    };
-
-    var authUri = $"{baseAuthUri}?{string.Join("&", authUriQueryParams.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"))}";
+    var authUri = _authService.GetOAuthUri();
 
     Process.Start(new ProcessStartInfo
     {
@@ -61,84 +60,73 @@ class LoginCommand(IAnsiConsole console, IConfiguration configuration) : Command
       UseShellExecute = true
     });
 
-    var oauthCode = string.Empty;
+    var successResponse = _resourceManager.GetResource("Success.html");
+    var errorResponse = _resourceManager.GetResource("Failure.html");
+    var responseHtml = successResponse;
 
-    _console.Status()
-      .Start("[bold]Waiting for login...[/]", ctx =>
+    using var listener = new HttpListener();
+    listener.Prefixes.Add(Constants.RedirectUri);
+    listener.Start();
+
+    var returnCode = 0;
+
+    await _console.Status()
+      .StartAsync("[bold]Waiting for login...[/]", async ctx =>
       {
-        using var listener = new HttpListener();
-        listener.Prefixes.Add(redirectUri!);
-        listener.Start();
 
         ctx.Spinner(Spinner.Known.Dots);
 
         var listenerContext = listener.GetContext();
-        oauthCode = listenerContext.Request.QueryString["code"];
+        var oauthCode = listenerContext.Request.QueryString["code"];
 
-        if (!string.IsNullOrEmpty(oauthCode))
+        TokenResponse tokenResponse;
+
+        try
         {
-          // TODO: Proper HTML response
-          var responseHtml = @"
-                <html>
-                <body>
-                    <script>
-                        alert('Login successful! You can close this window now.');
-                    </script>
-                </body>
-                </html>";
+          tokenResponse = await _authService.GetTokenAsync(oauthCode);
+          // TODO: Save tokenResponse to a file
+        }
+        catch (Exception ex) when (ex is LoginException)
+        {
+          returnCode = 1;
+          responseHtml = errorResponse;
+          _console.MarkupLine("[bold red]Failed to log in![/]");
+        }
+        finally
+        {
           var buffer = Encoding.UTF8.GetBytes(responseHtml);
           listenerContext.Response.ContentLength64 = buffer.Length;
           listenerContext.Response.OutputStream.Write(buffer, 0, buffer.Length);
           listenerContext.Response.Close();
+          listener.Stop();
         }
-
-        listener.Stop();
-
-        _console.MarkupLine($"[bold]Received OAuth code: {oauthCode}[/]");
       });
 
-    if (string.IsNullOrEmpty(oauthCode))
-    {
-      _console.MarkupLine("[bold red]Failed to get OAuth code[/]");
-      return 1;
-    }
+    return returnCode;
+  }
+}
 
-    // TODO: This probably needs to be a request to
-    // my own server to prevent asking people to use their
-    // own clients.
-    var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "https://oauth2.googleapis.com/token")
-    {
-      Content = new FormUrlEncodedContent(new Dictionary<string, string>
-      {
-        ["code"] = oauthCode,
-        ["client_id"] = clientId!,
-        ["client_secret"] = clientSecret!,
-        ["redirect_uri"] = redirectUri!,
-        ["grant_type"] = "authorization_code"
-      })
-    };
+interface IResourceManager
+{
+  string GetResource(string name);
+}
 
-    var tokenResponse = new HttpClient().Send(tokenRequest);
-
-    if (!tokenResponse.IsSuccessStatusCode)
-    {
-      _console.MarkupLine("[bold red]Failed to get OAuth token[/]");
-      return 1;
-    }
-
-    // TODO: Parse and persist tokens
-    var tokenResponseJson = tokenResponse.Content.ReadAsStringAsync().Result;
-
-    _console.MarkupLine($"[bold]OAuth token response: {tokenResponseJson}[/]");
-
-    return 0;
+class ResourceManager : IResourceManager
+{
+  public string GetResource(string name)
+  {
+    var assembly = Assembly.GetExecutingAssembly();
+    var resourceName = assembly.GetName().Name + ".Resources." + name;
+    using var stream = assembly.GetManifestResourceStream(resourceName) ?? throw new InvalidOperationException($"Resource '{resourceName}' not found");
+    using var reader = new StreamReader(stream);
+    return reader.ReadToEnd();
   }
 }
 
 interface IGoogleAuthService
 {
   string GetOAuthUri();
-  Task<TokenResponse> GetTokenAsync(string code);
+  Task<TokenResponse> GetTokenAsync(string? code);
 }
 
 class GoogleAuthService : IGoogleAuthService
@@ -166,10 +154,35 @@ class GoogleAuthService : IGoogleAuthService
     return authUri;
   }
 
-  public Task<TokenResponse> GetTokenAsync(string code)
+  public async Task<TokenResponse> GetTokenAsync(string? code)
   {
-    throw new NotImplementedException();
+    var tokenRequest = new HttpRequestMessage(HttpMethod.Post, TokenUri)
+    {
+      Content = new FormUrlEncodedContent(new Dictionary<string, string?>
+      {
+        ["code"] = code,
+        ["client_id"] = Constants.ClientId,
+        ["redirect_uri"] = Constants.RedirectUri,
+        ["grant_type"] = GrantType
+      })
+    };
+
+    var client = new HttpClient();
+    var tokenResponse = await client.SendAsync(tokenRequest);
+
+    if (tokenResponse.IsSuccessStatusCode is false)
+    {
+      throw new LoginException("Failed to get OAuth token");
+    }
+
+    var token = await tokenResponse.Content.ReadFromJsonAsync<TokenResponse>();
+
+    return token ?? throw new LoginException("Failed to parse OAuth token");
   }
+}
+
+class LoginException(string message) : Exception(message)
+{
 }
 
 record TokenResponse(
@@ -231,7 +244,7 @@ class TypeResolver(IHost provider) : ITypeResolver, IDisposable
 
   public object? Resolve(Type? type)
   {
-    return type != null ? _host.Services.GetService(type) : null;
+    return type is not null ? _host.Services.GetService(type) : null;
   }
 
   public void Dispose()

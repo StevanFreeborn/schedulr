@@ -28,12 +28,13 @@
     <GeneratedConstantsFile>$(GeneratedCodeDirectory)\Constants.cs</GeneratedConstantsFile>
   </PropertyGroup>
 
-  <Target Name="GenerateBuildConstants" BeforeTargets="BeforeCompile">
-    <PropertyGroup>
-      <ClientId>308790548431-rqpjahd0ul7lmpiegd5cgate1m4kkb11.apps.googleusercontent.com</ClientId>
-      <RedirectUri>http://localhost:7777/schedulr/login-callback/</RedirectUri>
-      <AuthUri>https://localhost:5555</AuthUri>
-    </PropertyGroup>
+  <PropertyGroup>
+    <ClientId>308790548431-rqpjahd0ul7lmpiegd5cgate1m4kkb11.apps.googleusercontent.com</ClientId>
+    <RedirectUri>http://localhost:7777/schedulr/login-callback/</RedirectUri>
+    <AuthUri>https://localhost:5555</AuthUri>
+  </PropertyGroup>
+
+  <Target Name="GenerateBuildConstants" BeforeTargets="BeforeBuild;BeforeRebuild">
 
     <MakeDir Directories="$(GeneratedCodeDirectory)" />
 
@@ -50,6 +51,14 @@ static class Constants
 }
 '
       Overwrite="true" />
+
+    <ItemGroup>
+      <Compile Include="$(GeneratedConstantsFile)" Exclude="@(Compile)" />
+    </ItemGroup>
   </Target>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\**\*" />
+  </ItemGroup>
 
 </Project>

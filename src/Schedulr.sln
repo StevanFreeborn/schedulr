@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schedulr.Console", "Schedul
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schedulr.Console.Tests", "Schedulr.Console.Tests\Schedulr.Console.Tests.csproj", "{18AD99DB-1E49-430C-8A81-54FB90145A4B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schedulr.API", "Schedulr.API\Schedulr.API.csproj", "{F2A9740D-FE76-43E2-BD6E-5316AA23CA45}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Schedulr.API.Tests", "Schedulr.API.Tests\Schedulr.API.Tests.csproj", "{6574F6C3-E849-407A-9F6E-E0719473516E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +28,13 @@ Global
 		{18AD99DB-1E49-430C-8A81-54FB90145A4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{18AD99DB-1E49-430C-8A81-54FB90145A4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{18AD99DB-1E49-430C-8A81-54FB90145A4B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2A9740D-FE76-43E2-BD6E-5316AA23CA45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2A9740D-FE76-43E2-BD6E-5316AA23CA45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2A9740D-FE76-43E2-BD6E-5316AA23CA45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2A9740D-FE76-43E2-BD6E-5316AA23CA45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6574F6C3-E849-407A-9F6E-E0719473516E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6574F6C3-E849-407A-9F6E-E0719473516E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6574F6C3-E849-407A-9F6E-E0719473516E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6574F6C3-E849-407A-9F6E-E0719473516E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
