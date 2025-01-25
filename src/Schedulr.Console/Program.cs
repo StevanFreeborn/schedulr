@@ -34,7 +34,7 @@ try
     .BuildApp()
     .RunAsync(args);
 }
-catch (Exception ex)
+catch (Exception ex) when (ex is SchedulrException)
 {
   AnsiConsole.MarkupLine("[bold red]An error occurred:[/]");
   AnsiConsole.MarkupLine(CultureInfo.InvariantCulture, "[bold red]{Message}[/]", ex.Message);
@@ -76,7 +76,7 @@ class LoginCommand(
 
         ctx.Spinner(Spinner.Known.Dots);
 
-        var listenerContext = listener.GetContext();
+        var listenerContext = await listener.GetContextAsync();
         var oauthCode = listenerContext.Request.QueryString["code"];
 
         TokenResponse tokenResponse;
@@ -96,7 +96,7 @@ class LoginCommand(
         {
           var buffer = Encoding.UTF8.GetBytes(responseHtml);
           listenerContext.Response.ContentLength64 = buffer.Length;
-          listenerContext.Response.OutputStream.Write(buffer, 0, buffer.Length);
+          await listenerContext.Response.OutputStream.WriteAsync(buffer);
           listenerContext.Response.Close();
           listener.Stop();
         }
@@ -156,7 +156,7 @@ class GoogleAuthService : IGoogleAuthService
 
   public async Task<TokenResponse> GetTokenAsync(string? code)
   {
-    var tokenRequest = new HttpRequestMessage(HttpMethod.Post, TokenUri)
+    using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, TokenUri)
     {
       Content = new FormUrlEncodedContent(new Dictionary<string, string?>
       {
@@ -167,7 +167,7 @@ class GoogleAuthService : IGoogleAuthService
       })
     };
 
-    var client = new HttpClient();
+    using var client = new HttpClient();
     var tokenResponse = await client.SendAsync(tokenRequest);
 
     if (tokenResponse.IsSuccessStatusCode is false)
@@ -181,8 +181,33 @@ class GoogleAuthService : IGoogleAuthService
   }
 }
 
-class LoginException(string message) : Exception(message)
+class LoginException : SchedulrException
 {
+  public LoginException()
+  {
+  }
+  public LoginException(string message) : base(message)
+  {
+  }
+
+  public LoginException(string message, Exception innerException) : base(message, innerException)
+  {
+  }
+}
+
+abstract class SchedulrException : Exception
+{
+  protected SchedulrException()
+  {
+  }
+
+  protected SchedulrException(string message) : base(message)
+  {
+  }
+
+  protected SchedulrException(string message, Exception innerException) : base(message, innerException)
+  {
+  }
 }
 
 record TokenResponse(
