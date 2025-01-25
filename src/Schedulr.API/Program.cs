@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
@@ -13,31 +11,57 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app
+  .MapPost("/auth/token", static ([AsParameters] AuthTokenRequest request) =>
+  {
+    var result = request.Validate(new ValidationContext(request));
 
-app.MapGet("/weatherforecast", () =>
-{
-  var forecast = Enumerable.Range(1, 5).Select(index =>
-      new WeatherForecast
-      (
-          DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-          RandomNumberGenerator.GetInt32(-20, 55),
-          summaries[RandomNumberGenerator.GetInt32(summaries.Length)]
-      ))
-      .ToArray();
-  return forecast;
-})
-.WithName("GetWeatherForecast");
+    if (result.Any())
+    {
+      return Results.BadRequest(result);
+    }
+
+    return Results.Ok();
+  })
+  .DisableAntiforgery();
 
 app.Run();
 
-sealed record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+record AuthTokenRequest(
+  [FromForm(Name = "client_id")]
+  string ClientId,
+  [FromForm(Name = "redirect_uri")]
+  string RedirectUri,
+  [FromForm(Name = "grant_type")]
+  string GrantType,
+  [FromForm(Name = "code")]
+  string Code
+) : IValidatableObject
 {
-  public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+  public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+  {
+    if (string.IsNullOrWhiteSpace(ClientId))
+    {
+      yield return new ValidationResult("Client ID is required", [nameof(ClientId)]);
+    }
+
+    if (string.IsNullOrWhiteSpace(RedirectUri))
+    {
+      yield return new ValidationResult("Redirect URI is required", [nameof(RedirectUri)]);
+    }
+
+    if (string.IsNullOrWhiteSpace(GrantType))
+    {
+      yield return new ValidationResult("Grant type is required", [nameof(GrantType)]);
+    }
+
+    if (string.IsNullOrWhiteSpace(Code))
+    {
+      yield return new ValidationResult("Code is required", [nameof(Code)]);
+    }
+  }
 }
 
+
 [ExcludeFromCodeCoverage]
-partial class Program { }
+public partial class Program { }
