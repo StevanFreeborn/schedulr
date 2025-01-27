@@ -28,7 +28,7 @@ try
     .ConfigureServices(static (_, services) =>
       {
         services.AddSingleton(AnsiConsole.Console);
-        services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
+        services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<IResourceManager, ResourceManager>();
       })
     .BuildApp()
@@ -42,12 +42,12 @@ catch (Exception ex) when (ex is SchedulrException)
 
 class LoginCommand(
   IAnsiConsole console,
-  IGoogleAuthService authService,
+  IAuthService authService,
   IResourceManager resourceManager
 ) : AsyncCommand
 {
   readonly IAnsiConsole _console = console;
-  readonly IGoogleAuthService _authService = authService;
+  readonly IAuthService _authService = authService;
   readonly IResourceManager _resourceManager = resourceManager;
 
   public override async Task<int> ExecuteAsync(CommandContext context)
@@ -123,27 +123,30 @@ class ResourceManager : IResourceManager
   }
 }
 
-interface IGoogleAuthService
+interface IAuthService
 {
   string GetOAuthUri();
   Task<TokenResponse> GetTokenAsync(string? code);
 }
 
-class GoogleAuthService : IGoogleAuthService
+class AuthService : IAuthService
 {
   const string BaseAuthUri = "https://accounts.google.com/o/oauth2/v2/auth";
-  const string TokenUri = "https://oauth2.googleapis.com/token";
+  const string ClientId = Constants.ClientId;
+  const string RedirectUri = Constants.RedirectUri;
+  const string ResponseType = "code";
   const string Scope = "https://www.googleapis.com/auth/calendar";
   const string AccessType = "offline";
+
+  const string BaseTokenUri = Constants.AuthUri;
   const string GrantType = "authorization_code";
-  const string ResponseType = "code";
 
   public string GetOAuthUri()
   {
     var authUriQueryParams = new Dictionary<string, string>
     {
-      ["client_id"] = Constants.ClientId,
-      ["redirect_uri"] = Constants.RedirectUri,
+      ["client_id"] = ClientId,
+      ["redirect_uri"] = RedirectUri,
       ["response_type"] = ResponseType,
       ["scope"] = Scope,
       ["access_type"] = AccessType
@@ -156,7 +159,8 @@ class GoogleAuthService : IGoogleAuthService
 
   public async Task<TokenResponse> GetTokenAsync(string? code)
   {
-    using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, TokenUri)
+    var uri = new Uri($"{BaseTokenUri}/auth/token", UriKind.Absolute);
+    using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, uri)
     {
       Content = new FormUrlEncodedContent(new Dictionary<string, string?>
       {
