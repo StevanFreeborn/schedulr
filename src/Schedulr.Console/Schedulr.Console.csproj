@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Spectre.Console" />
     <PackageReference Include="Spectre.Console.Cli" />
   </ItemGroup>
@@ -31,19 +32,7 @@
 
     <MakeDir Directories="$(GeneratedCodeDirectory)" />
 
-    <WriteLinesToFile
-      File="$(GeneratedConstantsFile)"
-      Lines='
-namespace $(AssemblyName).$(GeneratedCodeDirectory)%3b
-
-static class Constants
-{
-  public const string ClientId = "$(ClientId)"%3b
-  public const string RedirectUri = "$(RedirectUri)"%3b
-  public const string AuthUri = "$(AuthUri)"%3b
-}
-'
-      Overwrite="true" />
+    <WriteLinesToFile File="$(GeneratedConstantsFile)" Lines="&#xD;&#xA;namespace $(AssemblyName).$(GeneratedCodeDirectory)%3b&#xD;&#xA;&#xD;&#xA;static class Constants&#xD;&#xA;{&#xD;&#xA;  public const string ClientId = &quot;$(ClientId)&quot;%3b&#xD;&#xA;  public const string RedirectUri = &quot;$(RedirectUri)&quot;%3b&#xD;&#xA;  public const string AuthUri = &quot;$(AuthUri)&quot;%3b&#xD;&#xA;}&#xD;&#xA;" Overwrite="true" />
 
     <ItemGroup>
       <Compile Include="$(GeneratedConstantsFile)" Exclude="@(Compile)" />
@@ -51,7 +40,7 @@ static class Constants
   </Target>
   
   <ItemGroup>
-    <EmbeddedResource Include="Resources\**\*" />
+    <EmbeddedResource Include="Resources\Files\**\*" />
   </ItemGroup>
 
 </Project>

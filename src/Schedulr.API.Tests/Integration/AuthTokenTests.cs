@@ -5,7 +5,6 @@ public class AuthTokenTests : IntegrationTest
   public AuthTokenTests(AppFactory factory) : base(factory)
   {
     Factory.MockHandler.Clear();
-    Factory.MockHandler.ResetBackendDefinitions();
   }
 
   [Fact]
