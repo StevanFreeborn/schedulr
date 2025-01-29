@@ -1,17 +1,18 @@
 namespace Schedulr.Console.Auth;
 
-class AuthService(HttpClient client) : IAuthService
+class AuthService(HttpClient client, ISerializer serializer) : IAuthService
 {
   const string BaseAuthUri = "https://accounts.google.com/o/oauth2/v2/auth";
   const string ClientId = Constants.ClientId;
   const string RedirectUri = Constants.RedirectUri;
   const string ResponseType = "code";
-  const string Scope = "https://www.googleapis.com/auth/calendar";
+  const string Scope = "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.profile";
   const string AccessType = "offline";
   const string BaseTokenUri = Constants.AuthUri;
   const string GrantType = "authorization_code";
+  const string PromptType = "consent";
   readonly HttpClient _client = client;
-
+  readonly ISerializer _serializer = serializer;
 
   public string GetOAuthUri()
   {
@@ -21,7 +22,8 @@ class AuthService(HttpClient client) : IAuthService
       ["redirect_uri"] = RedirectUri,
       ["response_type"] = ResponseType,
       ["scope"] = Scope,
-      ["access_type"] = AccessType
+      ["access_type"] = AccessType,
+      ["prompt"] = PromptType,
     };
     var query = string.Join("&", authUriQueryParams.Select(static kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
     var authUri = $"{BaseAuthUri}?{query}";
@@ -44,14 +46,13 @@ class AuthService(HttpClient client) : IAuthService
     };
 
     var tokenResponse = await _client.SendAsync(tokenRequest);
+    var tokenResponseContent = await tokenResponse.Content.ReadAsStringAsync();
 
     if (tokenResponse.IsSuccessStatusCode is false)
     {
       throw new LoginException("Failed to get OAuth token");
     }
 
-    var token = await tokenResponse.Content.ReadFromJsonAsync<TokenResponse>();
-
-    return token ?? throw new LoginException("Failed to parse OAuth token");
+    return _serializer.Deserialize<TokenResponse>(tokenResponseContent) ?? throw new LoginException("Failed to parse OAuth token");
   }
 }

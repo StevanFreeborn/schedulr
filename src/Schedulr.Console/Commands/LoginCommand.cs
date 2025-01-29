@@ -3,12 +3,16 @@ namespace Schedulr.Console.Commands;
 class LoginCommand(
   IAnsiConsole console,
   IAuthService authService,
-  IResourceManager resourceManager
+  IProfileService profileService,
+  IResourceManager resourceManager,
+  ISettingsManager settingsManager
 ) : AsyncCommand
 {
   readonly IAnsiConsole _console = console;
   readonly IAuthService _authService = authService;
+  readonly IProfileService _profileService = profileService;
   readonly IResourceManager _resourceManager = resourceManager;
+  readonly ISettingsManager _settingsManager = settingsManager;
 
   public override async Task<int> ExecuteAsync(CommandContext context)
   {
@@ -44,7 +48,14 @@ class LoginCommand(
         try
         {
           tokenResponse = await _authService.GetTokenAsync(oauthCode);
-          // TODO: Save tokenResponse to a file
+          var userInfo = await _profileService.GetUserInfoAsync(tokenResponse.AccessToken);
+          var settings = await _settingsManager.ReadAsync();
+          var primaryName = userInfo.Names.FirstOrDefault(n => n.Metadata.Primary) ?? throw new LoginException("Failed to get primary name");
+
+          settings.AddAccount(new(primaryName.DisplayName, tokenResponse));
+
+          await _settingsManager.WriteAsync(settings);
+
           _console.MarkupLine("[bold green]Successfully logged in![/]");
         }
         catch (Exception ex) when (ex is LoginException)

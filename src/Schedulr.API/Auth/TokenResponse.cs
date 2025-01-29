@@ -11,4 +11,9 @@ record TokenResponse(
   string Scope,
   [property: JsonPropertyName("refresh_token")]
   string RefreshToken
-);
+)
+{
+  const int ExpirationSkew = 60;
+  public DateTimeOffset CreatedAt { get; } = DateTimeOffset.UtcNow;
+  public bool IsExpired => CreatedAt.AddSeconds(ExpiresIn) < DateTimeOffset.UtcNow + TimeSpan.FromSeconds(ExpirationSkew);
+}

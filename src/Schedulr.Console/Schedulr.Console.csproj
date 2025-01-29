@@ -11,12 +11,6 @@
     <PackageReference Include="Spectre.Console.Cli" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="appsettings*.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
   <PropertyGroup>
     <GeneratedCodeDirectory>Generated</GeneratedCodeDirectory>
     <GeneratedConstantsFile>$(GeneratedCodeDirectory)\Constants.cs</GeneratedConstantsFile>

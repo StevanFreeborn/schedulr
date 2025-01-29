@@ -2,5 +2,5 @@ namespace Schedulr.API.Auth;
 
 class GoogleOptions
 {
-  public string ClientSecret { get; set; } = string.Empty;
+  public string ClientSecret { get; init; } = string.Empty;
 }
