@@ -12,7 +12,7 @@ class Settings
 
   public void AddAccount(Account account)
   {
-    var existing = _accounts.FirstOrDefault(a => a.AccountId == account.AccountId);
+    var existing = _accounts.FirstOrDefault(a => a.AccountEmail == account.AccountEmail);
 
     if (existing is not null)
     {
@@ -23,8 +23,9 @@ class Settings
   }
 }
 
-class Account(string accountId, TokenResponse? token)
+class Account(string accountName, string accountEmail, TokenResponse? token)
 {
-  public string AccountId { get; init; } = accountId;
+  public string AccountName { get; init; } = accountName;
+  public string AccountEmail { get; init; } = accountEmail;
   public TokenResponse? Token { get; init; } = token;
 }

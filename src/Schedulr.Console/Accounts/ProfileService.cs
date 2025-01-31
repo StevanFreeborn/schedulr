@@ -8,7 +8,7 @@ class ProfileService(HttpClient client, ISerializer serializer) : IProfileServic
 
   public async Task<PersonResponse> GetUserInfoAsync(string accessToken)
   {
-    const string userInfoUri = $"{BaseUri}?personFields=names";
+    const string userInfoUri = $"{BaseUri}?personFields=names,emailAddresses";
     using var userInfoRequest = new HttpRequestMessage(HttpMethod.Get, userInfoUri);
     userInfoRequest.Headers.Add("Authorization", $"Bearer {accessToken}");
 

@@ -6,7 +6,7 @@ class AuthService(HttpClient client, ISerializer serializer) : IAuthService
   const string ClientId = Constants.ClientId;
   const string RedirectUri = Constants.RedirectUri;
   const string ResponseType = "code";
-  const string Scope = "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.profile";
+  const string Scope = "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email";
   const string AccessType = "offline";
   const string BaseTokenUri = Constants.AuthUri;
   const string GrantType = "authorization_code";

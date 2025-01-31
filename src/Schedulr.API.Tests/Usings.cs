@@ -16,5 +16,4 @@ global using RichardSzalay.MockHttp;
 
 global using Microsoft.AspNetCore.TestHost;
 global using Microsoft.Extensions.DependencyInjection;
-
 global using Schedulr.API.Auth;

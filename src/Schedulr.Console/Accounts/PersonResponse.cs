@@ -1,6 +1,11 @@
 namespace Schedulr.Console.Accounts;
 
-record PersonResponse(string ResourceName, string ETag, List<Name> Names);
+record PersonResponse(
+  string ResourceName,
+  string ETag,
+  List<Name> Names,
+  List<EmailAddress> EmailAddresses
+);
 
 record Name(
   Metadata Metadata,
@@ -11,6 +16,14 @@ record Name(
   string UnstructuredName
 );
 
-record Metadata(bool Primary, Source Source);
+record EmailAddress(
+  Metadata Metadata,
+  string Value,
+  string Type,
+  string FormattedType,
+  string DisplayName
+);
 
-record Source(string Type, string Id);
+record Metadata(bool Primary, bool SourcePrimary, bool Verified, Source Source);
+
+record Source(string Type, string Id, string ETag, DateTimeOffset UpdateTime);

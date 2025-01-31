@@ -51,18 +51,20 @@ class LoginCommand(
           var userInfo = await _profileService.GetUserInfoAsync(tokenResponse.AccessToken);
           var settings = await _settingsManager.ReadAsync();
           var primaryName = userInfo.Names.FirstOrDefault(n => n.Metadata.Primary) ?? throw new LoginException("Failed to get primary name");
+          var primaryEmail = userInfo.EmailAddresses.FirstOrDefault(e => e.Metadata.Primary) ?? throw new LoginException("Failed to get primary email");
 
-          settings.AddAccount(new(primaryName.DisplayName, tokenResponse));
+          settings.AddAccount(new(primaryName.DisplayName, primaryEmail.Value, tokenResponse));
 
           await _settingsManager.WriteAsync(settings);
 
           _console.MarkupLine("[bold green]Successfully logged in![/]");
         }
-        catch (Exception ex) when (ex is LoginException)
+        catch (Exception)
         {
           returnCode = 1;
           responseHtml = errorResponse;
           _console.MarkupLine("[bold red]Failed to log in![/]");
+          throw;
         }
         finally
         {

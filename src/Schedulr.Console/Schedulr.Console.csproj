@@ -9,6 +9,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Spectre.Console" />
     <PackageReference Include="Spectre.Console.Cli" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" />
   </ItemGroup>
 
   <PropertyGroup>

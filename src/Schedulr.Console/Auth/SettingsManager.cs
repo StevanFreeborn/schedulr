@@ -1,13 +1,14 @@
 namespace Schedulr.Console.Auth;
 
-class SettingsManager(ISerializer serializer) : ISettingsManager
+class SettingsManager(IFileSystem fileSystem, ISerializer serializer, IEncryptor encryptor) : ISettingsManager
 {
   const string SettingsFile = "schedulr.json";
-  readonly ISerializer _serializer = serializer;
   static readonly string SettingsPath = Path.Combine(AppContext.BaseDirectory, SettingsFile);
+  static readonly string Key = GetMachineInfo();
+  readonly IFileSystem _fileSystem = fileSystem;
+  readonly ISerializer _serializer = serializer;
+  readonly IEncryptor _encryptor = encryptor;
 
-  // TODO: Encrypt and decrypt settings...will use machine info to generate key
-  // used to encrypt and decrypt settings
   public async Task<Settings> ReadAsync()
   {
     if (File.Exists(SettingsPath) is false)
@@ -15,14 +16,24 @@ class SettingsManager(ISerializer serializer) : ISettingsManager
       return new Settings();
     }
 
-    var json = await File.ReadAllTextAsync(SettingsPath);
+    var encryptedJson = await _fileSystem.File.ReadAllTextAsync(SettingsPath);
+    var json = await _encryptor.DecryptAsync(encryptedJson, Key);
     var settings = _serializer.Deserialize<Settings>(json) ?? throw new JsonException("Failed to parse settings");
     return settings;
   }
 
-  public Task WriteAsync(Settings settings)
+  public async Task WriteAsync(Settings settings)
   {
     var json = _serializer.Serialize(settings);
-    return File.WriteAllTextAsync(SettingsPath, json);
+    var encryptedJson = await _encryptor.EncryptAsync(json, Key);
+    await _fileSystem.File.WriteAllTextAsync(SettingsPath, encryptedJson);
+  }
+
+  static string GetMachineInfo()
+  {
+    var machineName = Environment.MachineName;
+    var processorCount = Environment.ProcessorCount;
+    var userName = Environment.UserName;
+    return $"{machineName}{processorCount}{userName}";
   }
 }
