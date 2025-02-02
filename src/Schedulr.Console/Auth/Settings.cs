@@ -1,3 +1,4 @@
+
 namespace Schedulr.Console.Auth;
 
 class Settings
@@ -20,6 +21,20 @@ class Settings
     }
 
     _accounts.Add(account);
+  }
+
+  public Account? FindAccount(string account)
+  {
+    return _accounts.FirstOrDefault(
+      a =>
+        string.Equals(a.AccountName, account, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(a.AccountEmail, account, StringComparison.OrdinalIgnoreCase)
+    );
+  }
+
+  public void RemoveAccount(Account account)
+  {
+    _accounts.Remove(account);
   }
 }
 

@@ -9,8 +9,12 @@ static class HostBuilderExtensions
 
     app.Configure(static c =>
     {
-      c.AddCommand<LoginCommand>("login");
-      c.PropagateExceptions();
+      c.AddBranch("account", static c =>
+      {
+        c.AddCommand<AddAccountCommand>("add");
+        c.AddCommand<ListAccountCommand>("list");
+        c.AddCommand<RemoveAccountCommand>("remove");
+      });
     });
 
     return app;

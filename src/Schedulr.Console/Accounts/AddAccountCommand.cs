@@ -1,6 +1,6 @@
-namespace Schedulr.Console.Commands;
+namespace Schedulr.Console.Accounts;
 
-class LoginCommand(
+class AddAccountCommand(
   IAnsiConsole console,
   IAuthService authService,
   IProfileService profileService,
